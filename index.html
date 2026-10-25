@@ -16,7 +16,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 公用 Firebase 展示用配置 (使用開源免費 Cloud Firestore 實例)
     const firebaseConfig = {
       apiKey: "AIzaSyD-PlaceholderForDemoConfigOnly",
       authDomain: "savings-tracker-demo.firebaseapp.com",
@@ -26,7 +25,6 @@
       appId: "1:123456789012:web:abcdef123456"
     };
 
-    // 初始化 Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
@@ -49,13 +47,13 @@
         <h1 class="text-2xl font-bold flex items-center gap-2">
           <i class="fa-solid fa-piggy-bank"></i> 家庭專屬儲蓄追蹤器
         </h1>
-        <p class="text-emerald-100 text-sm mt-1">預計每月 $30,000 儲蓄目標 $\cdot$ 夫妻/情侶即時同步</p>
+        <p class="text-emerald-100 text-sm mt-1">預計每月 $30,000 儲蓄目標 • 夫妻/情侶即時同步</p>
       </div>
       
       <!-- Room Code / Share Section -->
       <div class="bg-emerald-700/80 p-3 rounded-xl border border-emerald-500/50 flex flex-wrap items-center gap-2 text-sm w-full md:w-auto">
         <span class="text-emerald-200">家庭同步房間:</span>
-        <input type="text" id="roomIdInput" class="bg-emerald-800 text-white font-mono px-3 py-1 rounded border border-emerald-500 w-28 text-center uppercase font-bold focus:outline-none focus:ring-2 focus:ring-white" value="HOME2026">
+        <input type="text" id="roomIdInput" class="bg-emerald-800 text-white font-mono px-3 py-1 rounded border border-emerald-500 w-28 text-center uppercase font-bold focus:outline-none focus:ring-2 focus:ring-white" value="LOVE2026">
         <button onclick="joinRoom()" class="bg-white text-emerald-700 font-semibold px-3 py-1 rounded hover:bg-emerald-50 transition text-xs shadow">
           連線/切換
         </button>
@@ -79,7 +77,343 @@
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span id="syncStatus">雲端同步中</span>
           </span>
-          <span class="text-xs text-slate-400 font-mono" id="currentRoomDisplay">房間: HOME2026</span>
+          <span class="text-xs text-slate-400 font-mono" id="currentRoomDisplay">房間: LOVE2026</span>
         </div>
         <div class="text-slate-500 text-xs">起始日期</div>
-        <input type="month" id="startMonth" class="mt-1 w-full p-2 border rounded-lg text-sm bg-slate-50 border-slate-200
+        <input type="month" id="startMonth" class="mt-1 w-full p-2 border rounded-lg text-sm bg-slate-50 border-slate-200" value="2026-01" onchange="updateStartMonth()">
+      </div>
+
+      <!-- Add Record Form -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <h2 class="text-base font-bold text-slate-700 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-emerald-600"></i> 新增/更新每月紀錄
+        </h2>
+        <form id="recordForm" onsubmit="saveRecord(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">月份</label>
+            <input type="month" id="recordMonth" required class="w-full p-2.5 border rounded-lg text-sm border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">實際儲蓄金額 ($)</label>
+            <input type="number" id="recordAmount" placeholder="30000" required min="0" step="100" class="w-full p-2.5 border rounded-lg text-sm border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">備註 (可選)</label>
+            <input type="text" id="recordNote" placeholder="例如: 老公花紅/額外支出" class="w-full p-2.5 border rounded-lg text-sm border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition shadow-sm text-sm flex justify-center items-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up"></i> 儲存並同步
+          </button>
+        </form>
+      </div>
+
+      <!-- Quick Summary Stats -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">儲蓄總計概覽</h3>
+        <div>
+          <div class="text-xs text-slate-500">累積實際總積蓄</div>
+          <div class="text-2xl font-bold text-emerald-600 font-mono" id="totalActual">$0</div>
+        </div>
+        <div class="pt-2 border-t border-slate-100">
+          <div class="text-xs text-slate-500">累積預計總目標</div>
+          <div class="text-lg font-semibold text-slate-700 font-mono" id="totalExpected">$0</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-500">目標達成率</div>
+          <div class="text-lg font-semibold text-emerald-700 font-mono" id="targetRate">0%</div>
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-1.5">
+            <div id="progressBar" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Visualizations & Table -->
+    <div class="md:col-span-2 space-y-6">
+
+      <!-- Chart Card -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-base font-bold text-slate-700 flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-emerald-600"></i> 積蓄增長對比圖
+          </h2>
+          <span class="text-xs text-slate-400">預計 ($30,000/月) vs 實際</span>
+        </div>
+        <div class="h-64 relative">
+          <canvas id="savingsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Records Table -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <h2 class="text-base font-bold text-slate-700 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-emerald-600"></i> 每月積蓄明細紀錄
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-500 border-b border-slate-100">
+              <tr>
+                <th class="p-3 font-semibold">月份</th>
+                <th class="p-3 font-semibold text-right">預計累積</th>
+                <th class="p-3 font-semibold text-right">實際儲蓄</th>
+                <th class="p-3 font-semibold">備註</th>
+                <th class="p-3 font-semibold text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody" class="divide-y divide-slate-100">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    let monthlyTarget = 30000;
+    let records = {};
+    let startMonth = "2026-01";
+    let currentRoom = "LOVE2026";
+    let myChart = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        currentRoom = roomParam.toUpperCase();
+        document.getElementById('roomIdInput').value = currentRoom;
+      }
+      
+      const today = new Date();
+      const monthStr = today.toISOString().slice(0, 7);
+      document.getElementById('recordMonth').value = monthStr;
+
+      initChart();
+      connectFirebaseRoom();
+    });
+
+    function connectFirebaseRoom() {
+      document.getElementById('currentRoomDisplay').textContent = '房間: ' + currentRoom;
+      document.getElementById('syncStatus').textContent = '連線中...';
+
+      if (window.unsubscribe) window.unsubscribe();
+
+      try {
+        const roomRef = window.doc(window.db, "savings_rooms", currentRoom);
+        window.unsubscribe = window.onSnapshot(roomRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            records = data.records || {};
+            if (data.startMonth) startMonth = data.startMonth;
+            document.getElementById('startMonth').value = startMonth;
+          } else {
+            records = {
+              "2026-01": { amount: 30000, note: "按預算完成" },
+              "2026-02": { amount: 35000, note: "老公加碼 $5,000" }
+            };
+            syncToFirebase();
+          }
+          document.getElementById('syncStatus').textContent = '已同步雲端';
+          renderAll();
+        }, (err) => {
+          document.getElementById('syncStatus').textContent = '離線模式 (本機)';
+          loadLocalStorage();
+          renderAll();
+        });
+      } catch (e) {
+        loadLocalStorage();
+        renderAll();
+      }
+    }
+
+    function syncToFirebase() {
+      try {
+        const roomRef = window.doc(window.db, "savings_rooms", currentRoom);
+        window.setDoc(roomRef, {
+          records: records,
+          startMonth: startMonth,
+          lastUpdated: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        saveLocalStorage();
+      }
+    }
+
+    function saveLocalStorage() {
+      localStorage.setItem('savings_records_' + currentRoom, JSON.stringify(records));
+      localStorage.setItem('savings_startMonth_' + currentRoom, startMonth);
+    }
+
+    function loadLocalStorage() {
+      const saved = localStorage.getItem('savings_records_' + currentRoom);
+      if (saved) records = JSON.parse(saved);
+      const savedStart = localStorage.getItem('savings_startMonth_' + currentRoom);
+      if (savedStart) startMonth = savedStart;
+    }
+
+    function joinRoom() {
+      const input = document.getElementById('roomIdInput').value.trim().toUpperCase();
+      if (!input) return;
+      currentRoom = input;
+      connectFirebaseRoom();
+    }
+
+    function copyShareLink() {
+      const url = window.location.origin + window.location.pathname + '?room=' + currentRoom;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('已複製分享連結！直接傳俾老公點開就可以即時同步：\n' + url);
+      });
+    }
+
+    function updateStartMonth() {
+      startMonth = document.getElementById('startMonth').value;
+      syncToFirebase();
+      renderAll();
+    }
+
+    function saveRecord(e) {
+      e.preventDefault();
+      const month = document.getElementById('recordMonth').value;
+      const amount = parseFloat(document.getElementById('recordAmount').value) || 0;
+      const note = document.getElementById('recordNote').value.trim();
+
+      records[month] = { amount, note };
+      syncToFirebase();
+      renderAll();
+
+      document.getElementById('recordNote').value = '';
+    }
+
+    function deleteRecord(month) {
+      if (confirm(`確定要刪除 ${month} 的紀錄嗎？`)) {
+        delete records[month];
+        syncToFirebase();
+        renderAll();
+      }
+    }
+
+    function renderAll() {
+      renderTable();
+      renderSummary();
+      updateChart();
+    }
+
+    function renderSummary() {
+      let totalActual = 0;
+      const months = Object.keys(records);
+      months.forEach(m => totalActual += records[m].amount);
+
+      const monthCount = Math.max(months.length, 1);
+      const totalExpected = monthCount * monthlyTarget;
+
+      document.getElementById('totalActual').textContent = '$' + totalActual.toLocaleString();
+      document.getElementById('totalExpected').textContent = '$' + totalExpected.toLocaleString();
+
+      const rate = totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0;
+      document.getElementById('targetRate').textContent = rate + '%';
+      document.getElementById('progressBar').style.width = Math.min(rate, 100) + '%';
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('recordsTableBody');
+      tbody.innerHTML = '';
+
+      const months = Object.keys(records).sort();
+
+      if (months.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">尚未有任何儲蓄紀錄，請在左側新增！</td></tr>`;
+        return;
+      }
+
+      let cumExpected = 0;
+
+      months.forEach((m) => {
+        cumExpected += monthlyTarget;
+        const item = records[m];
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition";
+        tr.innerHTML = `
+          <td class="p-3 font-mono font-medium text-slate-700">${m}</td>
+          <td class="p-3 font-mono text-right text-slate-400">$${cumExpected.toLocaleString()}</td>
+          <td class="p-3 font-mono text-right font-bold text-emerald-600">$${item.amount.toLocaleString()}</td>
+          <td class="p-3 text-slate-500 text-xs">${item.note || '-'}</td>
+          <td class="p-3 text-center">
+            <button onclick="deleteRecord('${m}')" class="text-rose-500 hover:text-rose-700 text-xs px-2 py-1 rounded">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('savingsChart').getContext('2d');
+      myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: '預計累積 ($)',
+              data: [],
+              borderColor: '#94a3b8',
+              borderDash: [5, 5],
+              backgroundColor: 'transparent',
+              tension: 0.1
+            },
+            {
+              label: '實際儲蓄 ($)',
+              data: [],
+              borderColor: '#059669',
+              backgroundColor: 'rgba(5, 150, 105, 0.1)',
+              fill: true,
+              tension: 0.3,
+              borderWidth: 3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top' }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: (val) => '$' + val.toLocaleString()
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChart() {
+      const months = Object.keys(records).sort();
+      let labels = [...months];
+
+      let cumExpected = 0;
+      let cumActual = 0;
+      const expectedData = [];
+      const actualData = [];
+
+      months.forEach(m => {
+        cumExpected += monthlyTarget;
+        cumActual += records[m].amount;
+        expectedData.push(cumExpected);
+        actualData.push(cumActual);
+      });
+
+      myChart.data.labels = labels;
+      myChart.data.datasets[0].data = expectedData;
+      myChart.data.datasets[1].data = actualData;
+      myChart.update();
+    }
+  </script>
+</body>
+</html>
